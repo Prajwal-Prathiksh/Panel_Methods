@@ -327,7 +327,7 @@ def streamline_vpn(XP, YP, XB, YB, phi, S):
     return Nx, Ny
 
 
-class XFOIL:
+class XFOIL_CLASS:
     """
     Class for interfacing with XFOIL.
 
@@ -428,10 +428,10 @@ def create_elliptical_panels(numB, a=1., b=1.):
 
     # Boundary points
     # Compute boundary point X-coordinate [radius of 1]
-    XB = a*np.cos(theta)
+    XB = a * np.cos(theta)
 
     # Compute boundary point Y-coordinate [radius of 1]
-    YB = b*np.sin(theta)
+    YB = b * np.sin(theta)
 
     # Number of panels
     # Number of panels (control points)
@@ -517,59 +517,91 @@ def compute_panel_geometries(numPan, XB, YB, AoA):
 
     return XC, YC, S, beta, delta, phi
 
+
 def populate_matrices_vpm(numPan, K, beta, Vinf):
     # Populate A matrix
-    A = np.zeros([numPan,numPan])                                                   # Initialize the A matrix
-    for i in range(numPan):                                                         # Loop over all i panels
-        for j in range(numPan):                                                     # Loop over all j panels
-            if (i == j):                                                            # If the panels are the same
-                A[i,j] = 0                                                          # Set A equal to zero
-            else:                                                                   # If panels are not the same
-                A[i,j] = -K[i,j]                                                    # Set A equal to negative geometric integral
-                
+    # Initialize the A matrix
+    A = np.zeros([numPan, numPan])
+    # Loop over all i panels
+    for i in range(numPan):
+        # Loop over all j panels
+        for j in range(numPan):
+            # If the panels are the same
+            if (i == j):
+                # Set A equal to zero
+                A[i, j] = 0
+
+            # If panels are not the same
+            else:
+                # Set A equal to negative geometric integral
+                A[i, j] = -K[i, j]
+
     # Populate b array
-    b = np.zeros(numPan)                                                            # Initialize the b array
-    for i in range(numPan):                                                         # Loop over all panels
-        b[i] = -Vinf*2*np.pi*np.cos(beta[i])                                        # Compute RHS array
+    # Initialize the b array
+    b = np.zeros(numPan)
+    # Loop over all panels
+    for i in range(numPan):
+        # Compute RHS array
+        b[i] = -Vinf * 2 * np.pi * np.cos(beta[i])
 
     return A, b
+
 
 def satisfy_kutta_condition_vpm(numPan, A, b, pct=100):
     # Satisfy the Kutta condition
-    panRep = int((pct/100)*numPan)-1                                                # Replace this panel with Kutta condition equation
-    if (panRep >= numPan):                                                          # If we specify the last panel
-        panRep = numPan-1                                                           # Set appropriate replacement panel index
-    A[panRep,:]        = 0                                                          # Set all colums of the replaced panel equation to zero
-    A[panRep,0]        = 1                                                          # Set first column of replaced panel equal to 1
-    A[panRep,numPan-1] = 1                                                          # Set last column of replaced panel equal to 1
-    b[panRep]          = 0                                                          # Set replaced panel value in b array equal to zero
+    # Replace this panel with Kutta condition equation
+    panRep = int((pct / 100) * numPan) - 1
+    # If we specify the last panel
+    if (panRep >= numPan):
+        # Set appropriate replacement panel index
+        panRep = numPan - 1
+
+    # Set all colums of the replaced panel equation to zero
+    A[panRep, :] = 0
+    # Set first column of replaced panel equal to 1
+    A[panRep, 0] = 1
+    # Set last column of replaced panel equal to 1
+    A[panRep, numPan - 1] = 1
+    # Set replaced panel value in b array equal to zero
+    b[panRep] = 0
 
     return A, b
 
+
 def compute_panel_velocities(numPan, gamma, beta, L, Vinf):
     # Compute velocities
-    Vt = np.zeros(numPan)                                                           # Initialize tangential velocity array
-    Cp = np.zeros(numPan)                                                           # Initialize pressure coefficient array
-    for i in range(numPan):                                                         # Loop over all i panels
-        addVal = 0                                                                  # Reset summation value to zero
-        for j in range(numPan):                                                     # Loop over all j panels
-            addVal = addVal - (gamma[j]/(2*np.pi))*L[i,j]                           # Sum all tangential vortex panel terms
-        
-        Vt[i] = Vinf*np.sin(beta[i]) + addVal + gamma[i]/2                          # Compute tangential velocity by adding uniform flow and i=j terms
-        Cp[i] = 1 - (Vt[i]/Vinf)**2                                                 # Compute pressure coefficient
+    # Initialize tangential velocity array
+    Vt = np.zeros(numPan)
+    # Initialize pressure coefficient array
+    Cp = np.zeros(numPan)
+    # Loop over all i panels
+    for i in range(numPan):
+        # Reset summation value to zero
+        addVal = 0
+        # Loop over all j panels
+        for j in range(numPan):
+            # Sum all tangential vortex panel terms
+            addVal = addVal - (gamma[j] / (2 * np.pi)) * L[i, j]
+
+        # Compute tangential velocity by adding uniform flow and i=j terms
+        Vt[i] = Vinf * np.sin(beta[i]) + addVal + gamma[i] / 2
+        # Compute pressure coefficient
+        Cp[i] = 1 - (Vt[i] / Vinf)**2
 
     return Vt, Cp
 
+
 def compute_force_coefficients(XC, phi, beta, AoAR, Cp, S):
     # Compute normal and axial force coefficients
-    CN = -Cp*S*np.sin(beta)                                                         # Normal force coefficient []
-    CA = -Cp*S*np.cos(beta)                                                         # Axial force coefficient []
+    # Normal force coefficient []
+    CN = -Cp * S * np.sin(beta)
+    # Axial force coefficient []
+    CA = -Cp * S * np.cos(beta)
 
     # Compute lift and drag coefficients
-    CL = sum(CN*np.cos(AoAR)) - sum(CA*np.sin(AoAR))                                # Decompose axial and normal to lift coefficient []
-    CD = sum(CN*np.sin(AoAR)) + sum(CA*np.cos(AoAR))                                # Decompose axial and normal to drag coefficient []
-    CM = sum(Cp*(XC-0.25)*S*np.cos(phi))
+    # Decompose axial and normal to lift coefficient []
+    CL = sum(CN * np.cos(AoAR)) - sum(CA * np.sin(AoAR))
+    # Decompose axial and normal to drag coefficient []
+    CD = sum(CN * np.sin(AoAR)) + sum(CA * np.cos(AoAR))
+    CM = sum(Cp * (XC - 0.25) * S * np.cos(phi))
     return CN, CA, CL, CD, CM
-
-
-
