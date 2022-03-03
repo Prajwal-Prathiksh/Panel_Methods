@@ -37,6 +37,34 @@ import math as math
 np.seterr('raise')
 
 def STREAMLINE_VPM(XP,YP,XB,YB,phi,S):
+    """
+    Compute the integral expression for constant strength vortex panels.
+    Vortex panel strengths are constant, but can change from panel to panel.
+    Geometric integral for X-direction: Nx(pj).
+    Geometric integral for Y-direction: Ny(pj).
+    
+    Parameters
+    ----------
+    XP  : float
+        X-coordinate of computation point, P
+    YP  : float
+        Y-coordinate of computation point, P
+    XB  : ndarray
+        X-coordinate of boundary points
+    YB  : ndarray
+        Y-coordinate of boundary points
+    phi : float
+        Angle between positive X-axis and interior of panel
+    S   : float
+        Length of panel
+
+    Returns
+    -------
+    Nx  : float
+        Value of X-direction geometric integral
+    Ny  : float
+        Value of Y-direction geometric integral
+    """
     
     # Number of panels
     numPan = len(XB)-1                                                          # Number of panels (control points)
