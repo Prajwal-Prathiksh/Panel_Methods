@@ -39,6 +39,34 @@ import math as math
 np.seterr('raise')
 
 def COMPUTE_KL_VPM(XC,YC,XB,YB,phi,S):
+    """
+    Compute the integral expression for constant strength vortex panels.
+    Vortex panel strengths are constant, but can change from panel to panel.
+    Geometric integral for panel-normal    : K(ij).
+    Geometric integral for panel-tangential: L(ij).
+
+    Parameters
+    ----------
+    XC  : float
+        X-coordinate of control points
+    YC  : float
+        Y-coordinate of control points
+    XB  : ndarray
+        X-coordinate of boundary points
+    YB  : ndarray
+        Y-coordinate of boundary points
+    phi : float
+        Angle between positive X-axis and interior of panel
+    S   : float
+        Length of panel
+
+    Returns
+    -------
+    K   : float
+        Value of panel-normal integral (Ref [1])
+    L   : float
+        Value of panel-tangential integral (Ref [2])
+    """
     
     # Number of panels
     numPan = len(XC)                                                                # Number of panels

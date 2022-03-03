@@ -4,6 +4,7 @@ from numba import njit
 from scipy import interpolate
 np.seterr('raise')
 
+
 @njit
 def is_complex(x):
     """
@@ -88,6 +89,128 @@ def compute_circulation(a, b, x0, y0, numT, Vx, Vy, X, Y):
 
 
 @njit
+def compute_kl_vpm(XC, YC, XB, YB, phi, S):
+    """
+    Compute the integral expression for constant strength vortex panels.
+    Vortex panel strengths are constant, but can change from panel to panel.
+    Geometric integral for panel-normal    : K(ij).
+    Geometric integral for panel-tangential: L(ij).
+
+    Parameters
+    ----------
+    XC  : ndarray
+        X-coordinate of control points
+    YC  : ndarray
+        Y-coordinate of control points
+    XB  : ndarray
+        X-coordinate of boundary points
+    YB  : ndarray
+        Y-coordinate of boundary points
+    phi : float
+        Angle between positive X-axis and interior of panel
+    S   : float
+        Length of panel
+
+    Returns
+    -------
+    K   : float
+        Value of panel-normal integral (Ref [1])
+    L   : float
+        Value of panel-tangential integral (Ref [2])
+    """
+
+    # Number of panels
+    # Number of panels
+    numPan = len(XC)
+
+    # Initialize arrays
+    # Initialize K integral matrix
+    K = np.zeros(numPan * numPan).reshape(numPan, numPan)
+    # Initialize L integral matrix
+    L = np.zeros(numPan * numPan).reshape(numPan, numPan)
+
+    # Compute integral
+    # Loop over i panels
+    for i in range(numPan):
+        # Loop over j panels
+        for j in range(numPan):
+
+            # If panel j is not the same as panel i
+            if (j != i):
+                # Compute intermediate values
+
+                # A term
+                A = -(XC[i] - XB[j]) * np.cos(phi[j]) - \
+                    (YC[i] - YB[j]) * np.sin(phi[j])
+
+                # B term
+                B = (XC[i] - XB[j])**2 + (YC[i] - YB[j])**2
+
+                # C term (normal)
+                Cn = -np.cos(phi[i] - phi[j])
+
+                # D term (normal)
+                Dn = (XC[i] - XB[j]) * np.cos(phi[i]) + \
+                    (YC[i] - YB[j]) * np.sin(phi[i])
+
+                # C term (tangential)
+                Ct = np.sin(phi[j] - phi[i])
+
+                # D term (tangential)
+                Dt = (XC[i] - XB[j]) * np.sin(phi[i]) - \
+                    (YC[i] - YB[j]) * np.cos(phi[i])
+
+                # E term
+                E = np.sqrt(B - A**2)
+
+                # If E term is 0 or complex or a NAN or an INF
+                if (E == 0 or is_complex(E) or np.isnan(E) or np.isinf(E)):
+                    # Set K value equal to zero
+                    K[i, j] = 0
+                    # Set L value equal to zero
+                    L[i, j] = 0
+
+                else:
+                    # Compute K
+
+                    # First term in K equation
+                    term1 = 0.5 * Cn * np.log((S[j]**2 + 2 * A * S[j] + B) / B)
+
+                    # Second term in K equation
+                    term2 = ((Dn - A * Cn) / E) * \
+                        (math.atan2((S[j] + A), E) - math.atan2(A, E))
+
+                    # Compute K integral
+                    K[i, j] = term1 + term2
+
+                    # Compute L
+
+                    # First term in L equation
+                    term1 = 0.5 * Ct * np.log((S[j]**2 + 2 * A * S[j] + B) / B)
+
+                    # Second term in L equation
+                    term2 = ((Dt - A * Ct) / E) * \
+                        (math.atan2((S[j] + A), E) - math.atan2(A, E))
+
+                    # Compute L integral
+                    L[i, j] = term1 + term2
+
+            # Zero out any problem values
+            # If K term is complex or a NAN or an INF
+            if (is_complex(K[i, j]) or np.isnan(K[i, j]) or np.isinf(K[i, j])):
+                # Set K value equal to zero
+                K[i, j] = 0
+
+            # If L term is complex or a NAN or an INF
+            if (is_complex(L[i, j]) or np.isnan(L[i, j]) or np.isinf(L[i, j])):
+                # Set L value equal to zero
+                L[i, j] = 0
+
+    # Return both K and L matrices
+    return K, L
+
+
+@njit
 def streamline_vpn(XP, YP, XB, YB, phi, S):
     """
     Compute the integral expression for constant strength vortex panels.
@@ -168,7 +291,8 @@ def streamline_vpn(XP, YP, XB, YB, phi, S):
             term1 = 0.5 * Cx * np.log((S[j]**2 + 2 * A * S[j] + B) / B)
 
             # Second term in Nx equation
-            term2 = ((Dx - A * Cx) / E) * (math.atan2((S[j] + A), E) - math.atan2(A, E))
+            term2 = ((Dx - A * Cx) / E) * \
+                (math.atan2((S[j] + A), E) - math.atan2(A, E))
 
             # Compute Nx integral
             Nx[j] = term1 + term2
@@ -178,7 +302,8 @@ def streamline_vpn(XP, YP, XB, YB, phi, S):
             term1 = 0.5 * Cy * np.log((S[j]**2 + 2 * A * S[j] + B) / B)
 
             # Second term in Ny equation
-            term2 = ((Dy - A * Cy) / E) * (math.atan2((S[j] + A), E) - math.atan2(A, E))
+            term2 = ((Dy - A * Cy) / E) * \
+                (math.atan2((S[j] + A), E) - math.atan2(A, E))
 
             # Compute Ny integral
             Ny[j] = term1 + term2

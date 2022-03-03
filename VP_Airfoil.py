@@ -45,8 +45,7 @@ import math as math
 import matplotlib.pyplot as plt
 from matplotlib import path
 from XFOIL import XFOIL
-from COMPUTE_KL_VPM import COMPUTE_KL_VPM
-from helper_funcs import compute_circulation, streamline_vpn
+from helper_funcs import compute_circulation, streamline_vpn, compute_kl_vpm
 
 
 # %% KNOWNS
@@ -67,10 +66,10 @@ AoAR = AoA*(np.pi/180)                                                          
 close_plots = True
 flagPlot = [0,      # Airfoil with panel normal vectors
             0,      # Geometry boundary pts, control pts, first panel, second panel
-            0,      # Cp vectors at airfoil surface panels
-            0,      # Pressure coefficient comparison (XFOIL vs. VPM)
-            1,      # Airfoil streamlines
-            1]      # Pressure coefficient contour
+            1,      # Cp vectors at airfoil surface panels
+            1,      # Pressure coefficient comparison (XFOIL vs. VPM)
+            0,      # Airfoil streamlines
+            0]      # Pressure coefficient contour
 
 
 # Grid parameters
@@ -152,7 +151,11 @@ beta[beta > 2*np.pi] = beta[beta > 2*np.pi] - 2*np.pi                           
 
 # Geometric integral (normal [K] and tangential [L])
 # - Refs [2] and [3]
-K, L = COMPUTE_KL_VPM(XC,YC,XB,YB,phi,S)                                        # Compute geometric integrals
+
+tic = time.perf_counter()
+K, L = compute_kl_vpm(XC,YC,XB,YB,phi,S)                                        # Compute geometric integrals
+toc = time.perf_counter()
+print('\n\nGeometric integrals computed in {:.3f} seconds'.format(toc-tic))
 
 # Populate A matrix
 A = np.zeros([numPan,numPan])                                                   # Initialize the A matrix
@@ -302,7 +305,8 @@ if (flagPlot[0] == 1):
     plt.title('Panel Geometry')                                                 # Set title
     plt.axis('equal')                                                           # Set axes equal
     plt.legend()                                                                # Display legend
-    plt.show()                                                                  # Display plot
+    if not close_plots:
+        plt.show()                                                              # Display plot
 
 # FIGURE: Geometry with the following indicated:
 # - Boundary points, control points, first panel, second panel
@@ -318,7 +322,8 @@ if (flagPlot[1] == 1):
     plt.ylabel('Y Units')                                                       # Set Y-label
     plt.axis('equal')                                                           # Set axes equal
     plt.legend()                                                                # Display legend
-    plt.show()                                                                  # Display plot
+    if not close_plots:
+        plt.show()                                                              # Display plot
 
 # FIGURE: Cp vectors at airfoil control points
 if (flagPlot[2] == 1):
@@ -341,7 +346,8 @@ if (flagPlot[2] == 1):
     plt.xlabel('X Units')                                                       # Set X-label
     plt.ylabel('Y Units')                                                       # Set Y-label
     plt.gca().set_aspect('equal')                                               # Set aspect ratio equal
-    plt.show()                                                                  # Show the plot
+    if not close_plots:
+        plt.show()                                                              # Display plot
 
 # FIGURE: Pressure coefficient comparison (XFOIL vs. VPM)
 if (flagPlot[3] == 1):
@@ -361,7 +367,8 @@ if (flagPlot[3] == 1):
     plt.xlabel('X Coordinate')                                                  # Set X-label
     plt.ylabel('Cp')                                                            # Set Y-label
     plt.title('Pressure Coefficient')                                           # Set title
-    plt.show()                                                                  # Display plot
+    if not close_plots:
+        plt.show()                                                              # Display plot
     plt.legend()                                                                # Display legend
     plt.gca().invert_yaxis()                                                    # Invert Cp (Y) axis
     
