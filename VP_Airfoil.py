@@ -63,20 +63,20 @@ NACA = '0012'                                                                   
 AoAR = AoA*(np.pi/180)                                                          # Angle of attack [rad]
 
 # Plotting flags
-close_plots = True
+close_plots = False
 flagPlot = [0,      # Airfoil with panel normal vectors
             0,      # Geometry boundary pts, control pts, first panel, second panel
-            1,      # Cp vectors at airfoil surface panels
-            1,      # Pressure coefficient comparison (XFOIL vs. VPM)
-            0,      # Airfoil streamlines
-            0]      # Pressure coefficient contour
+            0,      # Cp vectors at airfoil surface panels
+            0,      # Pressure coefficient comparison (XFOIL vs. VPM)
+            1,      # Airfoil streamlines
+            1]      # Pressure coefficient contour
 
 
 # Grid parameters
-nGridX   = 70                                                                   # X-grid for streamlines and contours
-nGridY   = 70                                                                   # Y-grid for streamlines and contours
-xVals    = [-0.5, 1.5]                                                          # X-grid extents [min, max]
-yVals    = [-0.3, 0.3]                                                          # Y-grid extents [min, max]
+nGridX   = 150                                                                   # X-grid for streamlines and contours
+nGridY   = 150                                                                   # Y-grid for streamlines and contours
+xVals    = [-1.5, 1.5]                                                          # X-grid extents [min, max]
+yVals    = [-1.5, 1.5]                                                          # Y-grid extents [min, max]
 
 # %% XFOIL - CREATE/LOAD AIRFOIL
 
@@ -367,10 +367,10 @@ if (flagPlot[3] == 1):
     plt.xlabel('X Coordinate')                                                  # Set X-label
     plt.ylabel('Cp')                                                            # Set Y-label
     plt.title('Pressure Coefficient')                                           # Set title
-    if not close_plots:
-        plt.show()                                                              # Display plot
     plt.legend()                                                                # Display legend
     plt.gca().invert_yaxis()                                                    # Invert Cp (Y) axis
+    if not close_plots:
+        plt.show()                                                              # Display plot
     
 # FIGURE: Airfoil streamlines
 if (flagPlot[4] == 1):
@@ -400,5 +400,7 @@ if (flagPlot[5] == 1):
     plt.gca().set_aspect('equal')                                               # Set axes equal
     plt.xlim(xVals)                                                             # Set X-limits
     plt.ylim(yVals)                                                             # Set Y-limits
+    plt.colorbar()
+    fname = os.path.join(os.getcwd(),'CpContour.png')
     if not close_plots:
         plt.show()                                                              # Display plot

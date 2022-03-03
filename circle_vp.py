@@ -73,11 +73,8 @@ flagPlot = [1,      # Shape polygon with panel normal vectors
             1]      # Pressure coefficient contour plot
 
 # Grid parameters
-# X-grid for streamlines and contours
-nGridX   = 100
-
-# Y-grid for streamlines and contours
-nGridY   = 70
+# X & Y grid for streamlines and contours
+nGridX = nGridY = 150
 
 # X-grid extents [min, max]
 xVals    = [-2, 2]
@@ -93,59 +90,27 @@ K, L = compute_kl_vpm(XC, YC, XB, YB, phi, S)
 A, b = populate_matrices_vpm(numPan, K, beta, Vinf)
 A, b = satisfy_kutta_condition_vpm(numPan, A, b, pct=args.replacement_pct)
 
-# Compute gamma values
-gamma = np.linalg.solve(A,b)                                                    # Compute all vortex strength values
+gamma = np.linalg.solve(A,b)
+print("Sum of gamma: ",sum(gamma*S))
 
-# Check the sum of the source strengths
-# - This should be very close to zero for a closed polygon
-print("Sum of gamma: ",sum(gamma*S))                                                  # Print sum of all vortex strengths
-
-# %% COMPUTE PANEL VELOCITIES AND PRESSURE COEFFICIENTS
-# Compute velocities
-Vt = np.zeros(numPan)                                                           # Initialize tangential velocity array
-Cp = np.zeros(numPan)                                                           # Initialize pressure coefficient array
-for i in range(numPan):                                                         # Loop over all i panels
-    addVal = 0                                                                  # Reset summation value to zero
-    for j in range(numPan):                                                     # Loop over all j panels
-        addVal = addVal - (gamma[j]/(2*np.pi))*L[i,j]                           # Sum all tangential vortex panel terms
-    
-    Vt[i] = Vinf*np.sin(beta[i]) + addVal + gamma[i]/2                          # Compute tangential velocity by adding uniform flow and i=j terms
-    Cp[i] = 1 - (Vt[i]/Vinf)**2                                                 # Compute pressure coefficient
-
+Vt, Cp = compute_panel_velocities(numPan, gamma, beta, L, Vinf)
 
 # Analytical angles and pressure coefficients
 analyticTheta = np.linspace(0,2*np.pi,200)                                      # Analytical theta angles [rad]
 analyticCP    = 1 - 4*np.sin(analyticTheta)**2                                  # Analytical pressure coefficient []
 
-# %% COMPUTE LIFT AND DRAG
-
-# Compute normal and axial force coefficients
-CN = -Cp*S*np.sin(beta)                                                         # Normal force coefficient []
-CA = -Cp*S*np.cos(beta)                                                         # Axial force coefficient []
-
-# Compute lift and drag coefficients
-CL = sum(CN*np.cos(AoAR)) - sum(CA*np.sin(AoAR))                                # Decompose axial and normal to lift coefficient []
-CD = sum(CN*np.sin(AoAR)) + sum(CA*np.cos(AoAR))                                # Decompose axial and normal to drag coefficient []
-
-print("CL      : ",CL)                                                          # Display lift coefficient (should be zero)
-print("CD      : ",CD)                                                          # Display drag coefficient (should be zero)
-# %% COMPUTE LIFT AND MOMENT COEFFICIENTS
-
-# Compute normal and axial force coefficients
-CN = -Cp*S*np.sin(beta)                                                         # Normal force coefficient []
-CA = -Cp*S*np.cos(beta)                                                         # Axial force coefficient []
-
-# Compute lift, drag, and moment coefficients
-CL = sum(CN*np.cos(AoAR)) - sum(CA*np.sin(AoAR))                                # Decompose axial and normal to lift coefficient []
-CM = sum(Cp*(XC-0.25)*S*np.cos(phi))                                            # Moment coefficient []
+CN, CA, CL, CD, CM = compute_force_coefficients(XC, phi, beta, AoAR, Cp, S)
 
 # Print the results to the Console
-print("======= RESULTS =======")
+print("\n======= RESULTS =======")
 print("Lift Coefficient (CL)")
-print("  K-J  : %2.8f" % (2*sum(gamma*S)))                                      # From Kutta-Joukowski lift equation
-print("  VPM  : %2.8f" % CL)                                                    # From this VPM code
-print("Moment Coefficient (CM)")
-print("  VPM  : %2.8f" % CM)                                                    # From this VPM code
+# From Kutta-Joukowski lift equation
+print(f"  K-J  : {2*sum(gamma*S)}")
+
+# From this VPM code
+print(f"  VPM  : {CL}")
+print("\nMoment Coefficient (CM)")
+print(f"  VPM  : {CM}")
 
 # %% COMPUTE STREAMLINES - REF [4]
 
@@ -221,7 +186,7 @@ if (flagPlot[0] == 1):
     plt.axis('equal')                                                           # Set axes equal
     plt.legend()                                                                # Show legend
     fname = os.path.join('figs','panel_geometry.png')                          
-    plt.savefig(fname, dpi=args.dpi)                                                  
+    plt.savefig(fname, dpi=args.dpi, bbox_inches='tight')                                                  
 
 # FIGURE: Geometry with the following indicated:
 # - Boundary points, control points, first panel, second panel
@@ -239,14 +204,14 @@ if (flagPlot[1] == 1):
     plt.axis('equal')                                                           # Set axes equal
     plt.legend()                                                                # Show legend
     fname = os.path.join('figs','panel_geometry2.png')                          
-    plt.savefig(fname, dpi=args.dpi)                                                  
+    plt.savefig(fname, dpi=args.dpi, bbox_inches='tight')                                                  
 
 # FIGURE: Analytical and SPM pressure coefficient
 if (flagPlot[2] == 1):
     fig = plt.figure(3)                                                         # Create figure
     plt.cla()                                                                   # Get ready for plotting
     plt.plot(analyticTheta*(180/np.pi),analyticCP,'b-',label='Analytical')      # Plot analytical pressure coefficient
-    plt.plot(beta*(180/np.pi),Cp,'ks',markerfacecolor='r',label='SPM')          # Plot panel method pressure coefficient
+    plt.plot(beta*(180/np.pi),Cp,'ks',markerfacecolor='r',label='VPM')          # Plot panel method pressure coefficient
     plt.xlabel('Angle [deg]')                                                   # Set X-label
     plt.ylabel('Pressure Coefficient')                                          # Set Y-label
     plt.title('Pressure Coefficient Comparison')                                # Set title
@@ -254,7 +219,7 @@ if (flagPlot[2] == 1):
     plt.ylim(-3.5, 1.5)                                                         # Set Y-limits
     plt.legend()                                                                # Show legend
     fname = os.path.join('figs','pressure_coefficient_comparison.png')                          
-    plt.savefig(fname, dpi=args.dpi)                                                  
+    plt.savefig(fname, dpi=args.dpi, bbox_inches='tight')                                          
 
 # FIGURE: Streamlines
 if (flagPlot[3] == 1):
@@ -271,7 +236,7 @@ if (flagPlot[3] == 1):
     plt.xlim(xVals)                                                             # Set X-limits
     plt.ylim(yVals)                                                             # Set Y-limits
     fname = os.path.join('figs','streamlines.png')                         
-    plt.savefig(fname, dpi=args.dpi)                                                  
+    plt.savefig(fname, dpi=args.dpi, bbox_inches='tight')                                               
 
 # FIGURE: Pressure coefficient contours
 if (flagPlot[4] == 1):
@@ -284,5 +249,6 @@ if (flagPlot[4] == 1):
     plt.gca().set_aspect('equal')                                               # Set axes equal
     plt.xlim(xVals)                                                             # Set X-limits
     plt.ylim(yVals)                                                             # Set Y-limits
+    plt.colorbar()
     fname = os.path.join('figs','pressure_coefficient_contours.png')                         
-    plt.savefig(fname, dpi=args.dpi)                                                  
+    plt.savefig(fname, dpi=args.dpi, bbox_inches='tight')                                                  

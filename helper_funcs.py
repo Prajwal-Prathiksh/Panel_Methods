@@ -545,3 +545,31 @@ def satisfy_kutta_condition_vpm(numPan, A, b, pct=100):
     b[panRep]          = 0                                                          # Set replaced panel value in b array equal to zero
 
     return A, b
+
+def compute_panel_velocities(numPan, gamma, beta, L, Vinf):
+    # Compute velocities
+    Vt = np.zeros(numPan)                                                           # Initialize tangential velocity array
+    Cp = np.zeros(numPan)                                                           # Initialize pressure coefficient array
+    for i in range(numPan):                                                         # Loop over all i panels
+        addVal = 0                                                                  # Reset summation value to zero
+        for j in range(numPan):                                                     # Loop over all j panels
+            addVal = addVal - (gamma[j]/(2*np.pi))*L[i,j]                           # Sum all tangential vortex panel terms
+        
+        Vt[i] = Vinf*np.sin(beta[i]) + addVal + gamma[i]/2                          # Compute tangential velocity by adding uniform flow and i=j terms
+        Cp[i] = 1 - (Vt[i]/Vinf)**2                                                 # Compute pressure coefficient
+
+    return Vt, Cp
+
+def compute_force_coefficients(XC, phi, beta, AoAR, Cp, S):
+    # Compute normal and axial force coefficients
+    CN = -Cp*S*np.sin(beta)                                                         # Normal force coefficient []
+    CA = -Cp*S*np.cos(beta)                                                         # Axial force coefficient []
+
+    # Compute lift and drag coefficients
+    CL = sum(CN*np.cos(AoAR)) - sum(CA*np.sin(AoAR))                                # Decompose axial and normal to lift coefficient []
+    CD = sum(CN*np.sin(AoAR)) + sum(CA*np.cos(AoAR))                                # Decompose axial and normal to drag coefficient []
+    CM = sum(Cp*(XC-0.25)*S*np.cos(phi))
+    return CN, CA, CL, CD, CM
+
+
+
