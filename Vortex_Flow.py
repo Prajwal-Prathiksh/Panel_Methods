@@ -8,7 +8,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from COMPUTE_CIRCULATION import COMPUTE_CIRCULATION
+from helper_funcs import compute_circulation
 
 # %% KNOWNS
 
@@ -52,7 +52,7 @@ b    = 2                                                                        
 x0   = 0                                                                        # Ellipse center X coordinate
 y0   = 0                                                                        # Ellipse center Y coordinate
 numT = 50                                                                       # Number of points along ellipse
-Gamma, xC, yC, VxC, VyC = COMPUTE_CIRCULATION(a,b,x0,y0,numT,Vx,Vy,X,Y)         # Call circulation calculation
+Gamma, xC, yC, VxC, VyC = compute_circulation(a,b,x0,y0,numT,Vx,Vy,X,Y)         # Call circulation calculation
 print("Circulation: ", Gamma)                                                   # Display circulation result
         
 #a    = 0.5                                                                      # Horizontal axis half-length

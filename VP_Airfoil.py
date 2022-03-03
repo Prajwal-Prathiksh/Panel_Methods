@@ -39,14 +39,15 @@
 # - [8]: Python code for downloading Selig airfoil DAT files
 #           Link: http://www.joshtheengineer.com/2019/01/30/uiuc-airfoil-database-file-download/
 
+import time as time
 import numpy as np
 import math as math
 import matplotlib.pyplot as plt
 from matplotlib import path
 from XFOIL import XFOIL
 from COMPUTE_KL_VPM import COMPUTE_KL_VPM
-from STREAMLINE_VPM import STREAMLINE_VPM
-from COMPUTE_CIRCULATION import COMPUTE_CIRCULATION
+from helper_funcs import compute_circulation, streamline_vpn
+
 
 # %% KNOWNS
 
@@ -63,12 +64,20 @@ NACA = '0012'                                                                   
 AoAR = AoA*(np.pi/180)                                                          # Angle of attack [rad]
 
 # Plotting flags
+close_plots = True
 flagPlot = [0,      # Airfoil with panel normal vectors
             0,      # Geometry boundary pts, control pts, first panel, second panel
-            1,      # Cp vectors at airfoil surface panels
-            1,      # Pressure coefficient comparison (XFOIL vs. VPM)
-            0,      # Airfoil streamlines
-            0]      # Pressure coefficient contour
+            0,      # Cp vectors at airfoil surface panels
+            0,      # Pressure coefficient comparison (XFOIL vs. VPM)
+            1,      # Airfoil streamlines
+            1]      # Pressure coefficient contour
+
+
+# Grid parameters
+nGridX   = 70                                                                   # X-grid for streamlines and contours
+nGridY   = 70                                                                   # Y-grid for streamlines and contours
+xVals    = [-0.5, 1.5]                                                          # X-grid extents [min, max]
+yVals    = [-0.3, 0.3]                                                          # Y-grid extents [min, max]
 
 # %% XFOIL - CREATE/LOAD AIRFOIL
 
@@ -208,11 +217,6 @@ print("  XFOIL: %2.8f" % xFoilCM)                                               
 # %% COMPUTE STREAMLINES - REF [4]
 
 if (flagPlot[4] == 1 or flagPlot[5] == 1):                                      # If we are plotting streamlines or pressure coefficient contours
-    # Grid parameters
-    nGridX   = 150                                                              # X-grid for streamlines and contours
-    nGridY   = 150                                                              # Y-grid for streamlines and contours
-    xVals    = [-0.5, 1.5]                                                      # X-grid extents [min, max]
-    yVals    = [-0.3, 0.3]                                                      # Y-grid extents [min, max]
     
     # Streamline parameters
     slPct  = 25                                                                 # Percentage of streamlines of the grid
@@ -234,12 +238,12 @@ if (flagPlot[4] == 1 or flagPlot[5] == 1):                                      
     afPath = path.Path(AF)                                                      # Create a path for the geometry
     
     # Solve for grid point X and Y velocities
+    tic = time.perf_counter()
     for m in range(nGridX):                                                     # Loop over X-grid points
         for n in range(nGridY):                                                 # Loop over Y-grid points
             XP     = XX[m,n]                                                    # Current iteration's X grid point
             YP     = YY[m,n]                                                    # Current iteration's Y grid point
-            Nx, Ny = STREAMLINE_VPM(XP,YP,XB,YB,phi,S)                          # Compute Nx and Ny geometric integrals
-            
+            Nx, Ny = streamline_vpn(XP,YP,XB,YB,phi,S)                          # Compute Nx and Ny geometric integrals
             # Check if grid points are in object
             # - If they are, assign a velocity of zero
             if afPath.contains_points([(XP,YP)]):                               # If (XP,YP) is in the body
@@ -248,6 +252,8 @@ if (flagPlot[4] == 1 or flagPlot[5] == 1):                                      
             else:
                 Vx[m,n] = Vinf*np.cos(AoAR) + sum(-gamma*Nx/(2*np.pi))          # Compute X-velocity
                 Vy[m,n] = Vinf*np.sin(AoAR) + sum(-gamma*Ny/(2*np.pi))          # Compute Y-velocity
+    toc = time.perf_counter()
+    print("\n\nSTREAMLINE_VPM: %.2f seconds" % (toc-tic))
     
     # Compute grid point velocity magnitude and pressure coefficient
     Vxy  = np.sqrt(Vx**2 + Vy**2)                                               # Compute magnitude of velocity vector []
@@ -262,7 +268,7 @@ if (flagPlot[4] == 1 or flagPlot[5] == 1):                                      
     x0   = 0.5                                                                  # Ellipse center X-coordinate
     y0   = 0                                                                    # Ellipse center Y-coordinate
     numT = 5000                                                                 # Number of points on ellipse
-    Circulation, xC, yC, VxC, VyC = COMPUTE_CIRCULATION(aa,bb,x0,y0,            # Compute circulation around ellipse
+    Circulation, xC, yC, VxC, VyC = compute_circulation(aa,bb,x0,y0,            # Compute circulation around ellipse
                                                        numT,Vx,Vy,Xgrid,Ygrid)
     
     # Print values to Console
@@ -373,7 +379,8 @@ if (flagPlot[4] == 1):
     plt.gca().set_aspect('equal')                                               # Set axes equal
     plt.xlim(xVals)                                                             # Set X-limits
     plt.ylim(yVals)                                                             # Set Y-limits
-    plt.show()                                                                  # Display plot
+    if not close_plots:
+        plt.show()                                                              # Display plot
 
 # FIGURE: Pressure coefficient contour
 if (flagPlot[5] == 1):
@@ -386,4 +393,5 @@ if (flagPlot[5] == 1):
     plt.gca().set_aspect('equal')                                               # Set axes equal
     plt.xlim(xVals)                                                             # Set X-limits
     plt.ylim(yVals)                                                             # Set Y-limits
-    plt.show()                                                                  # Display plot
+    if not close_plots:
+        plt.show()                                                              # Display plot

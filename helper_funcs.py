@@ -2,9 +2,29 @@ import math as math
 import numpy as np
 from numba import njit
 from scipy import interpolate
-
+np.seterr('raise')
 
 @njit
+def is_complex(x):
+    """
+    Check if a value is complex
+
+    Parameters
+    ----------
+    x : float
+        Value to check
+
+    Returns
+    -------
+    bool
+        True if complex, False otherwise
+    """
+    if np.imag(x) == 0:
+        return False
+    else:
+        return True
+
+
 def compute_circulation(a, b, x0, y0, numT, Vx, Vy, X, Y):
     """
     Compute the circulation around the defined ellipse
@@ -68,7 +88,7 @@ def compute_circulation(a, b, x0, y0, numT, Vx, Vy, X, Y):
 
 
 @njit
-def streamline_vpm(XP, YP, XB, YB, phi, S):
+def streamline_vpn(XP, YP, XB, YB, phi, S):
     """
     Compute the integral expression for constant strength vortex panels.
     Vortex panel strengths are constant, but can change from panel to panel.
@@ -112,53 +132,66 @@ def streamline_vpm(XP, YP, XB, YB, phi, S):
     # Loop over all panels
     for j in range(numPan):
         # Compute intermediate values
-        A = -(XP - XB[j]) * np.cos(phi[j]) - (YP - YB[j]) * \
-            np.sin(phi[j])              # A term
+
+        # A term
+        A = -(XP - XB[j]) * np.cos(phi[j]) - (YP - YB[j]) * np.sin(phi[j])
+
         # B term
         B = (XP - XB[j])**2 + (YP - YB[j])**2
+
         # Cx term (X-direction)
+
         Cx = np.sin(phi[j])
+
         # Dx term (X-direction)
         Dx = -(YP - YB[j])
+
         # Cy term (Y-direction)
         Cy = -np.cos(phi[j])
+
         # Dy term (Y-direction)
         Dy = XP - XB[j]
+
         # E term
         E = math.sqrt(B - A**2)
-        if (
-            E == 0 or np.iscomplex(E) or np.isnan(E) or np.isinf(E)
-        ):           # If E term is 0 or complex or a NAN or an INF
+
+        # If E term is 0 or complex or a NAN or an INF
+        if (E == 0 or is_complex(E) or np.isnan(E) or np.isinf(E)):
             # Set Nx value equal to zero
             Nx[j] = 0
+
             # Set Ny value equal to zero
             Ny[j] = 0
         else:
             # Compute Nx, Ref [1]
             # First term in Nx equation
             term1 = 0.5 * Cx * np.log((S[j]**2 + 2 * A * S[j] + B) / B)
+
             # Second term in Nx equation
-            term2 = ((Dx - A * Cx) / E) * \
-                (math.atan2((S[j] + A), E) - math.atan2(A, E))
+            term2 = ((Dx - A * Cx) / E) * (math.atan2((S[j] + A), E) - math.atan2(A, E))
+
             # Compute Nx integral
             Nx[j] = term1 + term2
 
             # Compute Ny, Ref [1]
             # First term in Ny equation
             term1 = 0.5 * Cy * np.log((S[j]**2 + 2 * A * S[j] + B) / B)
+
             # Second term in Ny equation
-            term2 = ((Dy - A * Cy) / E) * \
-                (math.atan2((S[j] + A), E) - math.atan2(A, E))
+            term2 = ((Dy - A * Cy) / E) * (math.atan2((S[j] + A), E) - math.atan2(A, E))
+
             # Compute Ny integral
             Ny[j] = term1 + term2
 
         # Zero out any problem values
-        if (np.iscomplex(Nx[j]) or np.isnan(Nx[j]) or np.isinf(
-                Nx[j])):         # If Nx term is complex or a NAN or an INF
+        # If Nx term is complex or a NAN or an INF
+        if (is_complex(Nx[j]) or np.isnan(Nx[j]) or np.isinf(Nx[j])):
             # Set Nx value equal to zero
             Nx[j] = 0
-        if (np.iscomplex(Ny[j]) or np.isnan(Ny[j]) or np.isinf(
-                Ny[j])):         # If Ny term is complex or a NAN or an INF
+
+        # If Ny term is complex or a NAN or an INF
+        # if (np.iscomplex(Ny[j]) or np.isnan(Ny[j]) or np.isinf(Ny[j])):
+        if (np.isnan(Ny[j]) or np.isinf(Ny[j])):
             # Set Ny value equal to zero
             Ny[j] = 0
 
