@@ -28,8 +28,7 @@ import ntpath                                                                   
 
 def XFOIL(NACA,PPAR,AoA,flagAirfoil):
 
-    # %% CALL XFOIL FROM MATLAB
-    
+    # %% CALL XFOIL FROM MATLAB    
     xFoilResults = list(range(9))                                               # Initialize results array
     
     if (flagAirfoil[0] == 1):                                                   # If the user wants XFOIL to create a NACA airfoil

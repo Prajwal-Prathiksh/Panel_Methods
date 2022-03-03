@@ -1,5 +1,9 @@
+import os
 import math as math
 import numpy as np
+from tkinter import Tk
+from tkinter.filedialog import askopenfilename
+import ntpath
 from numba import njit
 from scipy import interpolate
 np.seterr('raise')
@@ -321,3 +325,223 @@ def streamline_vpn(XP, YP, XB, YB, phi, S):
             Ny[j] = 0
 
     return Nx, Ny
+
+
+class XFOIL:
+    """
+    Class for interfacing with XFOIL.
+
+    Parameters
+    ----------
+    NACA : str
+        NACA airfoil name
+    PPAR : float
+        PPAR menu options
+    AoA : float
+        Angle of attack (in degrees)
+    load_type : str
+        To load the airfoil or create a new one (default: 'create')
+    """
+
+    def __init__(self, NACA, PPAR, AoA, load_type='create'):
+        self.NACA = NACA
+        self.PPAR = PPAR
+        self.AoA = AoA
+        self.load_type = load_type
+
+        if self.load_type == "create":
+            self.airfoil_name = self.NACA
+            self.xFoilResults = dict(airfoil_name=self.airfoil_name)
+
+        elif self.load_type == "load":
+            # Create GUI for open file dialog box
+            root = Tk()
+            # File types allowed to be loaded
+            ftypes = [('dat file', "*.dat")]
+            # Title of the dialog box GUI
+            ttl = "Select Airfoil File"
+            # Initial directory of the dialog box GUI
+            dir1 = '/Airfoil_DAT_Selig/'
+            # Needed for closing the Tk window later
+            root.withdraw()
+            # Needed for closing the Tk window later
+            root.update()
+
+            # User input of airfoil file to load
+            root.fileName = askopenfilename(filetypes=ftypes,
+                                            initialdir=dir1,
+                                            title=ttl)
+            # Destroy the Tk window
+            root.destroy()
+
+            # https://stackoverflow.com/questions/8384737/extract-file-name-from-path-no-matter-what-the-os-path-format
+            head, tail = ntpath.split(root.fileName)
+            # Retain only airfoil name, not extension
+            self.airfoil_name = tail[0:len(tail) - 4]
+
+            self.xFoilResults = dict(airfoil_name=self.airfoil_name)
+
+
+def create_elliptical_panels(numB, a=1., b=1.):
+    """
+    Creates an ellipse with a specified number of panels, such that
+    a^2 + b^2 = 1.
+    Note: If a and b are equal, a circle of radius 1 is created.
+
+    Parameters
+    ----------
+    numB : int
+        Number of boundary points
+    a : float, default = 1.
+        Semi-major axis of ellipse
+    b : float, default = 1.
+        Semi-minor axis of ellipse
+
+    Returns
+    -------
+    XB : ndarray
+        X-coordinate of boundary points
+    YB : ndarray
+        Y-coordinate of boundary points
+    numPan : int
+        Number of panels
+    """
+    # Boundary point angle offset [deg]
+    tO = (360 / (numB - 1)) / 2
+
+    # Normalise axes' length
+    if a == b:
+        a = b = 1.
+    else:
+        norm = math.sqrt(a**2 + b**2)
+        a, b = a / norm, b / norm
+
+    # Angles used to compute boundary points
+    # Create angles for computing boundary point locations [deg]
+    theta = np.linspace(0, 360, numB)
+
+    # Add panel angle offset [deg]
+    theta = theta + tO
+
+    # Convert from degrees to radians [rad]
+    theta = theta * (np.pi / 180)
+
+    # Boundary points
+    # Compute boundary point X-coordinate [radius of 1]
+    XB = a*np.cos(theta)
+
+    # Compute boundary point Y-coordinate [radius of 1]
+    YB = b*np.sin(theta)
+
+    # Number of panels
+    # Number of panels (control points)
+    numPan = len(XB) - 1
+
+    return XB, YB, numPan
+
+
+def correct_panels_orientation(numPan, XB, YB):
+    # Check for direction of points
+    edge = np.zeros(numPan)
+
+    # Loop over all panels
+    for i in range(numPan):
+        # Compute edge values
+        edge[i] = (XB[i + 1] - XB[i]) * (YB[i + 1] + YB[i])
+
+    # Sum of all edge values
+    sumEdge = np.sum(edge)
+
+    # If panels are CCW, flip them (don't if CW)
+    if (sumEdge < 0):
+        # Flip the X-data array
+        XB = np.flipud(XB)
+
+        # Flip the Y-data array
+        YB = np.flipud(YB)
+
+    return XB, YB
+
+
+def compute_panel_geometries(numPan, XB, YB, AoA):
+
+    # Convert AoA to radians [rad]
+    AoAR = AoA * (np.pi / 180)
+
+    # Initialize control point X-coordinate
+    XC = np.zeros(numPan)
+
+    # Initialize control point Y-coordinate
+    YC = np.zeros(numPan)
+
+    # Initialize panel length array
+    S = np.zeros(numPan)
+
+    # Initialize panel orientation angle array
+    phi = np.zeros(numPan)
+
+    # Find geometric quantities of the airfoil
+    # Loop over all panels
+    for i in range(numPan):
+        # X-value of control point
+        XC[i] = 0.5 * (XB[i] + XB[i + 1])
+
+        # Y-value of control point
+        YC[i] = 0.5 * (YB[i] + YB[i + 1])
+
+        # Change in X between boundary points
+        dx = XB[i + 1] - XB[i]
+
+        # Change in Y between boundary points
+        dy = YB[i + 1] - YB[i]
+
+        # Length of the panel
+        S[i] = (dx**2 + dy**2)**0.5
+
+        # Angle of panel (positive X-axis to inside face)
+        phi[i] = math.atan2(dy, dx)
+
+        # Make all panel angles positive [rad]
+        if (phi[i] < 0):
+            phi[i] = phi[i] + 2 * np.pi
+
+    # Compute angle of panel normal w.r.t. horizontal and include AoA
+    # Angle of panel normal [rad]
+    delta = phi + (np.pi / 2)
+
+    # Angle of panel normal and AoA [rad]
+    beta = delta - AoAR
+
+    # Make all panel angles between 0 and 2pi [rad]
+    beta[beta > 2 * np.pi] = beta[beta > 2 * np.pi] - 2 * np.pi
+
+    return XC, YC, S, beta, delta, phi
+
+def populate_matrices_vpm(numPan, K, beta, Vinf):
+    # Populate A matrix
+    A = np.zeros([numPan,numPan])                                                   # Initialize the A matrix
+    for i in range(numPan):                                                         # Loop over all i panels
+        for j in range(numPan):                                                     # Loop over all j panels
+            if (i == j):                                                            # If the panels are the same
+                A[i,j] = 0                                                          # Set A equal to zero
+            else:                                                                   # If panels are not the same
+                A[i,j] = -K[i,j]                                                    # Set A equal to negative geometric integral
+                
+    # Populate b array
+    b = np.zeros(numPan)                                                            # Initialize the b array
+    for i in range(numPan):                                                         # Loop over all panels
+        b[i] = -Vinf*2*np.pi*np.cos(beta[i])                                        # Compute RHS array
+
+    return A, b
+
+def satisfy_kutta_condition_vpm(numPan, A, b, pct=100):
+    # Satisfy the Kutta condition
+    panRep = int((pct/100)*numPan)-1                                                # Replace this panel with Kutta condition equation
+    if (panRep >= numPan):                                                          # If we specify the last panel
+        panRep = numPan-1                                                           # Set appropriate replacement panel index
+    A[panRep,:]        = 0                                                          # Set all colums of the replaced panel equation to zero
+    A[panRep,0]        = 1                                                          # Set first column of replaced panel equal to 1
+    A[panRep,numPan-1] = 1                                                          # Set last column of replaced panel equal to 1
+    b[panRep]          = 0                                                          # Set replaced panel value in b array equal to zero
+
+    return A, b

@@ -1,3 +1,4 @@
 *.exe
 *.pyc
 Airfoil_DAT_Selig/*
+figs/*
